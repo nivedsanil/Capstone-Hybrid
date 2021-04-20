@@ -1,45 +1,64 @@
-
+from surprise import AlgoBase
+from surprise import PredictionImpossible
+from MovieLensData import MovieLensData
 import math
 import numpy as np
 import heapq
-from MovieLensData import MovieLensData
-from surprise import AlgoBase
 
 class ContentFiltering(AlgoBase):
 
-    def __init__(self, k=60, sim_options={}):
+    def __init__(self, k=40, sim_options={}):
         AlgoBase.__init__(self)
         self.k = k
 
-    def fit(self, trainData):
+    def fit(self, trainset):
+        AlgoBase.fit(self, trainset)
 
-        movielens = MovieLensData()
-        AlgoBase.fit(self, trainData)
+        ml = MovieLensData()
+        genres = ml.returnGenres()
+        years = ml.returnYears()
+        mes = ml.returnMES()
+            
+        self.similarities = np.zeros((self.trainset.n_items, self.trainset.n_items))
 
-        mesData = movielens.returnMES()
-        yearsData = movielens.returnYears()
-        genreData = movielens.returnGenres()
-        
-        self.similarities = np.zeros((self.trainData.n_items, self.trainData.n_items))
+        for thisRating in range(self.trainset.n_items):
+ 
+            for otherRating in range(thisRating+1, self.trainset.n_items):
+                thisMovieID = int(self.trainset.to_raw_iid(thisRating))
+                otherMovieID = int(self.trainset.to_raw_iid(otherRating))
+                # print("Computing Genre Similarity")
+                genreSimilarity = self.computeGenreSimilarity(thisMovieID, otherMovieID, genres)
+                # print("Computing Year Similarity")
+                yearSimilarity = self.computeYearSimilarity(thisMovieID, otherMovieID, years)
+                # print("Computing Mise En Scene Similarity")
+                mesSimilarity = self.computeMiseEnSceneSimilarity(thisMovieID, otherMovieID, mes)
+                self.similarities[thisRating, otherRating] = genreSimilarity * yearSimilarity*mesSimilarity
+                self.similarities[otherRating, thisRating] = self.similarities[thisRating, otherRating]
 
-        for thisMovieRating in range(self.trainData.n_items):
-
-            for otherMovieRating in range(thisMovieRating+1, self.trainData.n_items):
-                this_ID = int(self.trainData.to_raw_iid(thisMovieRating))
-                other_ID = int(self.trainData.to_raw_iid(otherMovieRating))
-
-                calcMesSim = self.calcMesSim(this_ID, other_ID, mesData)
-                calcGenreSim = self.calcGenreSim(this_ID, other_ID, genreData)
-                calcYearSim = self.calcYearSim(this_ID, other_ID, yearsData)
-                
-                
-                self.similarities[thisMovieRating, otherMovieRating] = calcGenreSim*calcYearSim*calcMesSim
-                self.similarities[otherMovieRating, thisMovieRating] = self.similarities[thisMovieRating, otherMovieRating]
                 
         return self
-
     
-    def calcMesSim(self, movie1, movie2, mesData):
+    def computeGenreSimilarity(self, movie1, movie2, genres):
+        
+        genres1 = genres[movie1]
+        genres2 = genres[movie2]
+        sumxx, sumxy, sumyy = 0, 0, 0
+        for i in range(len(genres1)):
+            x = genres1[i]
+            y = genres2[i]
+            sumxx += x * x
+            sumyy += y * y
+            sumxy += x * y
+        
+        return sumxy/math.sqrt(sumxx*sumyy)
+    
+    def computeYearSimilarity(self, movie1, movie2, years):
+    
+        diff = abs(years[movie1] - years[movie2])
+        sim = math.exp(-diff / 10.0)
+        return sim
+    
+    def computeMiseEnSceneSimilarity(self, movie1, movie2, mesData):
         
         mv1 = mesData[movie1]
         mv2 = mesData[movie2]
@@ -54,51 +73,31 @@ class ContentFiltering(AlgoBase):
         else:
             return 0
 
-    def calcYearSim(self, movie1, movie2, yearsData):
-
-    diff = abs(yearsData[movie1] - yearsData[movie2])
-    sim_score = math.exp(-diff / 10.0)
-    return sim_score
-
-    def calcGenreSim(self, movie1, movie2, genreData):
-
-    xx = 0
-    yy = 0
-    xy = 0
-    
-    genre_mv1 = genres[movie1]
-    genre_mv2 = genres[movie2]
-
-    for i in range(len(genre_mv1)):
-        x = genre_mv1[i]
-        y = genre_mv2[i]
-        xx += x * x
-        yy += y * y
-        xy += x * y
-
-    cos_sim = xy/math.sqrt(xx*yy)
-    
-    return cos_sim
-
     def estimate(self, u, i):
 
-        neighbour_list = []
-        for rating in self.trainData.ur[u]:
-            calcGenreSim = self.similarities[i,rating[0]]
-            neighbour_list.append( (calcGenreSim, rating[1]) )
-
-        k_neighbors = heapq.nlargest(self.k, neighbour_list, key=lambda t: t[0])
-
-        total_simScore = 0
-        weighted_totalSimScore = 0
-
-        for (similarityScore, rating) in k_neighbors:
-            if (similarityScore > 0):
-                total_simScore += similarityScore
-                weighted_totalSimScore += simScore * rating
+        if not (self.trainset.knows_user(u) and self.trainset.knows_item(i)):
+            raise PredictionImpossible('User and/or item is unkown.')
+        
+        # Build up similarity scores between this item and everything the user rated
+        neighbors = []
+        for rating in self.trainset.ur[u]:
+            genreSimilarity = self.similarities[i,rating[0]]
+            neighbors.append( (genreSimilarity, rating[1]) )
+        
+        # Extract the top-K most-similar ratings
+        k_neighbors = heapq.nlargest(self.k, neighbors, key=lambda t: t[0])
+        
+        # Compute average sim score of K neighbors weighted by user ratings
+        simTotal = weightedSum = 0
+        for (simScore, rating) in k_neighbors:
+            if (simScore > 0):
+                simTotal += simScore
+                weightedSum += simScore * rating
             
+        if (simTotal == 0):
+            raise PredictionImpossible('No neighbors')
 
-        predictedRating = weighted_totalSimScore / total_simScore
+        predictedRating = weightedSum / simTotal
 
         return predictedRating
     

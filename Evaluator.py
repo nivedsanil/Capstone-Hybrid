@@ -1,7 +1,7 @@
 
 from EvaluationData import EvaluationData
 from EvaluatedAlgorithm import EvaluatedAlgorithm
-from MovieLens import MovieLens
+from MovieLensData import MovieLensData
 
 class Evaluator:
     
@@ -55,7 +55,7 @@ class Evaluator:
             
             print ("\nRecommendation Generated:")
             
-            years = ml.getYears()
+            years = ml.returnYears()
 
             for userID, movieID, actualRating, estimatedRating, _ in predictions:
 
