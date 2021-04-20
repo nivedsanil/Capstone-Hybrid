@@ -21,16 +21,15 @@ class Evaluator:
             print("Evaluating ", algorithm.GetName(), "...")
             results[algorithm.GetName()] = algorithm.Evaluate(self.dataset, doTopN)
 
-        # Print results
         print("\n")
         
         if (doTopN):
-            print("{:<50} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10}".format(
-                    "Algorithm", "RMSE", "MAE", "HR", "cHR", "ARHR", "Coverage", "Diversity", "Novelty"))
+            print("{:<50} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10} {:<10}".format(
+                    "Algorithm", "RMSE", "MAE", "HR", "cHR", "Coverage", "Diversity", "Novelty"))
             for (name, metrics) in results.items():
-                print("{:<50} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f}".format(
-                        name, metrics["RMSE"], metrics["MAE"], metrics["HR"], metrics["cHR"], metrics["ARHR"],
-                                      metrics["Coverage"], metrics["Diversity"], metrics["Novelty"]))
+                print("{:<50} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f} {:<10.4f}".format(
+                        name, metrics["RMSE"], metrics["MAE"], metrics["HR"], metrics["cHR"],
+                        metrics["Coverage"], metrics["Diversity"], metrics["Novelty"]))
         else:
             print("{:<10} {:<10} {:<10}".format("Algorithm", "RMSE", "MAE"))
             for (name, metrics) in results.items():
@@ -68,7 +67,7 @@ class Evaluator:
             recommendations.sort(key=lambda x: x[1], reverse=True)
             
             for ratings in recommendations[:10]:
-                print(ml.getMovieName(ratings[0]), ratings[1])
+                print(ml.returnMovieName(ratings[0]), ratings[1])
                 
 
             

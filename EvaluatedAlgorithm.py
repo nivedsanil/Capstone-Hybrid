@@ -1,5 +1,5 @@
 
-from RecommenderMetrics import RecommenderMetrics
+from PerformanceMetrics import PerformanceMetrics
 from EvaluationData import EvaluationData
 
 class EvaluatedAlgorithm:
@@ -8,58 +8,43 @@ class EvaluatedAlgorithm:
         self.algorithm = algorithm
         self.name = name
         
-    def Evaluate(self, evaluationData, doTopN, n=10, verbose=False):
-        metrics = {}
-        # Compute accuracy
-        if (verbose):
-            print("Evaluating accuracy...")
-        self.algorithm.fit(evaluationData.GetTrainSet())
-        predictions = self.algorithm.test(evaluationData.GetTestSet())
-        metrics["RMSE"] = RecommenderMetrics.RMSE(predictions)
-        metrics["MAE"] = RecommenderMetrics.MAE(predictions)
+    def Evaluate(self, data_evaluation, doTopN, n=10):
+
+        self.algorithm.fit(data_evaluation.GetTrainSet())
+        predictions = self.algorithm.test(data_evaluation.GetTestSet())
+
+        metrics_dict = {}
+
+        metrics_dict["RMSE"] = PerformanceMetrics.RMSE(predictions)
+        metrics_dict["MAE"] = PerformanceMetrics.MAE(predictions)
         
         if (doTopN):
-            # Evaluate top-10 with Leave One Out testing
-            if (verbose):
-                print("Evaluating top-N Recommendations")
-            self.algorithm.fit(evaluationData.GetLOOCVTrainSet())
-            leftOutPredictions = self.algorithm.test(evaluationData.GetLOOCVTestSet())        
-            # Build predictions for all ratings not in the training set
-            allPredictions = self.algorithm.test(evaluationData.GetLOOCVAntiTestSet())
-            # Compute top 10 recs for each user
-            topNPredicted = RecommenderMetrics.GetTopN(allPredictions, n)
-            if (verbose):
-                print("Computing hit-rate and rank metrics...")
-            # See how often we recommended a movie the user actually rated
-            metrics["HR"] = RecommenderMetrics.HitRate(topNPredicted, leftOutPredictions)   
-            # See how often we recommended a movie the user actually liked
-            metrics["cHR"] = RecommenderMetrics.CumulativeHitRate(topNPredicted, leftOutPredictions)
-            # Compute ARHR
-            metrics["ARHR"] = RecommenderMetrics.AverageReciprocalHitRank(topNPredicted, leftOutPredictions)
-        
-            #Evaluate properties of recommendations on full training set
-            if (verbose):
-                print("Computing recommendations with full data set...")
-            self.algorithm.fit(evaluationData.GetFullTrainSet())
-            allPredictions = self.algorithm.test(evaluationData.GetFullAntiTestSet())
-            topNPredicted = RecommenderMetrics.GetTopN(allPredictions, n)
-            if (verbose):
-                print("Analyzing coverage, diversity, and novelty...")
-            # Print user coverage with a minimum predicted rating of 4.0:
-            metrics["Coverage"] = RecommenderMetrics.UserCoverage(  topNPredicted, 
-                                                                   evaluationData.GetFullTrainSet().n_users, 
-                                                                   ratingThreshold=4.0)
-            # Measure diversity of recommendations:
-            metrics["Diversity"] = RecommenderMetrics.Diversity(topNPredicted, evaluationData.GetSimilarities())
             
-            # Measure novelty (average popularity rank of recommendations):
-            metrics["Novelty"] = RecommenderMetrics.Novelty(topNPredicted, 
-                                                            evaluationData.GetPopularityRankings())
+            self.algorithm.fit(data_evaluation.GetLOOCVTrainSet())
+
+            leftOutPredictions = self.algorithm.test(data_evaluation.GetLOOCVTestSet())        
+            allPredictions = self.algorithm.test(data_evaluation.GetLOOCVAntiTestSet())
+            topNPredicted = PerformanceMetrics.ComputeTopN(allPredictions, n)
+
+           
+            metrics_dict["HR"] = PerformanceMetrics.HitRate(topNPredicted, leftOutPredictions)   
+            metrics_dict["cHR"] = PerformanceMetrics.CumulativeHitRate(topNPredicted, leftOutPredictions)
+            
+            self.algorithm.fit(data_evaluation.GetFullTrainSet())
+            allPredictions = self.algorithm.test(data_evaluation.GetFullAntiTestSet())
+            topNPredicted = PerformanceMetrics.ComputeTopN(allPredictions, n)
+
+                
+            metrics_dict["Coverage"] = PerformanceMetrics.UserCoverage(  topNPredicted, 
+                                                                   data_evaluation.GetFullTrainSet().n_users, 
+                                                                   ratingThreshold=4.0)
+
+            metrics_dict["Diversity"] = PerformanceMetrics.Diversity(topNPredicted, data_evaluation.GetSimilarities())
+
+            metrics_dict["Novelty"] = PerformanceMetrics.Novelty(topNPredicted, 
+                                                            data_evaluation.GetPopularityRankings())
         
-        if (verbose):
-            print("Analysis complete.")
-    
-        return metrics
+        return metrics_dict
     
     def GetName(self):
         return self.name
