@@ -13,7 +13,7 @@ class ContentFiltering(AlgoBase):
 
     def fit(self, trainData):
 
-        movielens = MovieLens()
+        movielens = MovieLensData()
         AlgoBase.fit(self, trainData)
 
         mesData = movielens.returnMES()

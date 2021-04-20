@@ -12,7 +12,7 @@ np.random.seed(0)
 random.seed(0)
 
 def LoadData():
-    movielens = MovieLens()
+    movielens = MovieLensData()
     print("Loading all ratings and computing popularity ranks from Movie Lens...")
     data = movielens.loadMovieLens()
     ranks= movielens.computePopularity()
